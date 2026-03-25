@@ -88,6 +88,55 @@ if st.button("Analyze Ticket", type="primary"):
             st.error(f"Analysis failed: {exc}")
 
 st.divider()
+st.subheader("Context -> Knowledge Graph Flow")
+st.caption("Insert one ticket and inspect how extracted context is written into Neo4j.")
+
+st.markdown(
+    "**Suggested test ticket summary:** `Delete duplicate opportunity record for ACME account`"
+)
+
+trace_ticket_id = st.text_input(
+    "Optional ticket ID (leave empty to auto-generate)", value=""
+)
+trace_summary = st.text_area(
+    "Ticket summary for context -> KG trace",
+    value="Delete duplicate opportunity record for ACME account",
+    height=90,
+)
+
+if st.button("Trace Context to KG"):
+    if not trace_summary.strip():
+        st.warning("Please enter a ticket summary.")
+    else:
+        try:
+            trace = graph.add_ticket_with_trace(
+                summary=trace_summary.strip(),
+                ticket_id=trace_ticket_id.strip(),
+            )
+
+            st.success(f"Ticket inserted: `{trace['ticket_id']}`")
+            st.markdown("**Extracted Context**")
+            c1, c2, c3 = st.columns(3)
+            c1.write(f"Action: `{trace['extracted']['action']}`")
+            c2.write(f"Object: `{trace['extracted']['object']}`")
+            c3.write(f"Problem: `{trace['extracted']['problem']}`")
+
+            st.markdown("**Routing Decision**")
+            st.info(trace["routing"])
+
+            st.markdown("**Cypher Write Steps Used**")
+            for i, query in enumerate(trace["write_cypher"], start=1):
+                st.code(query, language="cypher")
+
+            st.markdown("**Created / Linked KG Records For This Ticket**")
+            if trace["created_links"]:
+                st.dataframe(trace["created_links"], use_container_width=True)
+            else:
+                st.write("No outgoing links found for this ticket.")
+        except Exception as exc:
+            st.error(f"Trace failed: {exc}")
+
+st.divider()
 st.subheader("Cypher Result Panel")
 st.caption("Run a Cypher query and inspect returned rows.")
 
