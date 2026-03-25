@@ -4,3 +4,4 @@ fresh_env/
 __pycache__/
 .tmp/
 *.pyc
+.env
