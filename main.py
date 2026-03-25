@@ -3,6 +3,7 @@ NEO4J CONTEXT GRAPH - SIMPLE DEMO (10 Tickets Only)
 """
 
 import os
+from datetime import datetime
 from typing import Dict, List
 
 import pandas as pd
@@ -118,6 +119,45 @@ class SimpleNeo4jDemo:
                 )
 
         print(f"Added: {ticket_id}")
+
+    def add_ticket_with_trace(self, summary: str, ticket_id: str = "") -> Dict:
+        """
+        Add one ticket and return a context-to-KG trace.
+        This is useful to inspect how extracted context became graph entities.
+        """
+        final_ticket_id = ticket_id.strip() or f"DEMO-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        extracted = self.extract_info(summary)
+        self.add_ticket(final_ticket_id, summary)
+
+        with self.driver.session() as session:
+            result = session.run(
+                """
+                MATCH (t:Ticket {id: $ticket_id})
+                OPTIONAL MATCH (t)-[r]->(x)
+                RETURN t.id AS ticket_id,
+                       t.summary AS ticket_summary,
+                       type(r) AS relationship,
+                       labels(x) AS target_labels,
+                       x.name AS target_name
+                ORDER BY relationship
+                """,
+                ticket_id=final_ticket_id,
+            )
+            rows = [dict(record) for record in result]
+
+        return {
+            "ticket_id": final_ticket_id,
+            "summary": summary,
+            "extracted": extracted,
+            "routing": self.get_routing(extracted),
+            "write_cypher": [
+                "CREATE (t:Ticket {id: $id, summary: $summary})",
+                "MATCH (t:Ticket {id: $ticket_id}) MERGE (a:Action {name: $action}) CREATE (t)-[:HAS_ACTION]->(a)",
+                "MATCH (t:Ticket {id: $ticket_id}) MERGE (o:Object {name: $object}) CREATE (t)-[:HAS_OBJECT]->(o)",
+                "MATCH (t:Ticket {id: $ticket_id}) MERGE (p:Problem {name: $problem}) CREATE (t)-[:HAS_PROBLEM]->(p)",
+            ],
+            "created_links": rows,
+        }
 
     def create_similarity_links(self):
         """Create SIMILAR_TO relationships between tickets with same action + object."""
