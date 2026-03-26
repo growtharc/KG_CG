@@ -1,3 +1,6 @@
+import os
+import tempfile
+
 import streamlit as st
 
 from main import SimpleNeo4jDemo
@@ -61,6 +64,63 @@ except Exception as exc:
 st.divider()
 st.subheader("Context Graph Builder")
 st.caption("Create context graph nodes from unstructured text. This does not update the KG.")
+
+st.markdown("**PDF -> Context Graph (No KG update)**")
+uploaded_pdf = st.file_uploader("Upload unstructured PDF", type=["pdf"])
+pdf_document_id = st.text_input("PDF context document ID (optional)", value="")
+pdf_max_chunks_per_page = st.number_input(
+    "Max chunks per page", min_value=1, max_value=200, value=30, step=1
+)
+pdf_source = st.text_input("PDF source label", value="pdf_upload")
+pdf_clear_context = st.checkbox("Clear existing context graph before PDF ingest", value=False)
+
+if st.button("Build Context Graph From PDF", use_container_width=True):
+    if uploaded_pdf is None:
+        st.warning("Please upload a PDF file.")
+    else:
+        temp_path = ""
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+                temp_file.write(uploaded_pdf.getbuffer())
+                temp_path = temp_file.name
+
+            pdf_result = graph.build_context_graph_from_pdf(
+                pdf_path=temp_path,
+                document_id=pdf_document_id.strip(),
+                source=pdf_source.strip() or "pdf_upload",
+                max_chunks_per_page=int(pdf_max_chunks_per_page),
+                clear_existing_context=pdf_clear_context,
+            )
+
+            st.success(
+                f"Built context graph for document `{pdf_result['document_id']}` "
+                f"with `{pdf_result['processed_chunks']}` chunks."
+            )
+
+            st.markdown("**Parsed Chunks (first 20)**")
+            st.dataframe(pdf_result["parsed_chunks"][:20], use_container_width=True)
+
+            st.markdown("**Sample Context Traces (first 10)**")
+            st.dataframe(
+                [
+                    {
+                        "chunk_id": t["chunk_id"],
+                        "page_id": t["page_id"],
+                        "action": t["extracted"]["action"],
+                        "object": t["extracted"]["object"],
+                        "problem": t["extracted"]["problem"],
+                    }
+                    for t in pdf_result["sample_traces"]
+                ],
+                use_container_width=True,
+            )
+        except Exception as exc:
+            st.error(f"PDF context build failed: {exc}")
+        finally:
+            if temp_path and os.path.exists(temp_path):
+                os.remove(temp_path)
+
+st.markdown("---")
 
 context_summary = st.text_area(
     "Unstructured text chunk",
