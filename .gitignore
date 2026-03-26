@@ -1,5 +1,6 @@
 venv/
 .venv/
+.venv312/
 fresh_env/
 __pycache__/
 .tmp/
