@@ -21,6 +21,17 @@ def render_stats(stats):
     col4.metric("Similarity Links", stats["similarity_count"])
 
 
+def render_context_stats(stats):
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Context Documents", stats["document_count"])
+    col2.metric("Context Pages", stats["page_count"])
+    col3.metric("Context Chunks", stats["chunk_count"])
+    col4, col5, col6 = st.columns(3)
+    col4.metric("Context Actions", stats["action_count"])
+    col5.metric("Context Objects", stats["object_count"])
+    col6.metric("Context Problems", stats["problem_count"])
+
+
 graph = get_graph()
 
 with st.sidebar:
@@ -46,6 +57,67 @@ try:
     render_stats(stats)
 except Exception as exc:
     st.warning(f"Could not fetch graph stats yet: {exc}")
+
+st.divider()
+st.subheader("Context Graph Builder")
+st.caption("Create context graph nodes from unstructured text. This does not update the KG.")
+
+context_summary = st.text_area(
+    "Unstructured text chunk",
+    value="Delete duplicate opportunity record for ACME account",
+    height=90,
+)
+context_document_id = st.text_input(
+    "Context document ID (optional)", value=""
+)
+ctx_col1, ctx_col2, ctx_col3 = st.columns(3)
+with ctx_col1:
+    context_page_number = st.number_input("Page", min_value=1, max_value=10000, value=1, step=1)
+with ctx_col2:
+    context_chunk_index = st.number_input("Chunk", min_value=1, max_value=100000, value=1, step=1)
+with ctx_col3:
+    context_source = st.text_input("Source", value="manual")
+
+ctx_btn1, ctx_btn2 = st.columns(2)
+with ctx_btn1:
+    build_context_clicked = st.button("Build Context Graph Node", use_container_width=True)
+with ctx_btn2:
+    clear_context_clicked = st.button("Clear Context Graph", use_container_width=True)
+
+if build_context_clicked:
+    if not context_summary.strip():
+        st.warning("Please enter text to build context graph.")
+    else:
+        try:
+            trace = graph.create_context_graph_from_summary(
+                summary=context_summary.strip(),
+                document_id=context_document_id.strip(),
+                page_number=int(context_page_number),
+                chunk_index=int(context_chunk_index),
+                source=context_source.strip() or "manual",
+            )
+            st.session_state["last_context_trace"] = trace
+            st.success(f"Context chunk created: `{trace['chunk_id']}`")
+        except Exception as exc:
+            st.error(f"Context graph build failed: {exc}")
+
+if clear_context_clicked:
+    try:
+        graph.clear_context_graph()
+        st.success("Context graph cleared.")
+    except Exception as exc:
+        st.error(f"Could not clear context graph: {exc}")
+
+try:
+    context_stats = graph.get_context_graph_stats()
+    render_context_stats(context_stats)
+except Exception as exc:
+    st.warning(f"Could not fetch context graph stats: {exc}")
+
+if "last_context_trace" in st.session_state:
+    last_context_trace = st.session_state["last_context_trace"]
+    st.markdown("**Last Context Trace**")
+    st.json(last_context_trace)
 
 st.divider()
 st.subheader("Find Similar Tickets")
