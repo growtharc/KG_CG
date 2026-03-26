@@ -33,6 +33,20 @@ pip install -r requirements.txt
 streamlit run .\streamlit_app.py
 ```
 
+## Run FastAPI (hardcoded backend mode)
+
+```powershell
+.\fresh_env\Scripts\Activate.ps1
+uvicorn api_app:app --host 127.0.0.1 --port 8000 --reload
+```
+
+## Test API endpoints
+
+```powershell
+.\fresh_env\Scripts\Activate.ps1
+python .\test_api_smoke.py
+```
+
 ## Notes
 
 - CSV and `.env` are ignored by Git.
