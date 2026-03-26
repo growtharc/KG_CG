@@ -39,6 +39,152 @@ class SimpleNeo4jDemo:
             session.run("MATCH (n) DETACH DELETE n")
         print("Database cleared")
 
+    def ensure_context_graph_schema(self):
+        """Create constraints for the context graph namespace."""
+        statements = [
+            "CREATE CONSTRAINT context_document_id IF NOT EXISTS FOR (d:ContextDocument) REQUIRE d.id IS UNIQUE",
+            "CREATE CONSTRAINT context_page_id IF NOT EXISTS FOR (p:ContextPage) REQUIRE p.id IS UNIQUE",
+            "CREATE CONSTRAINT context_chunk_id IF NOT EXISTS FOR (c:ContextChunk) REQUIRE c.id IS UNIQUE",
+            "CREATE CONSTRAINT context_action_name IF NOT EXISTS FOR (a:ContextAction) REQUIRE a.name IS UNIQUE",
+            "CREATE CONSTRAINT context_object_name IF NOT EXISTS FOR (o:ContextObject) REQUIRE o.name IS UNIQUE",
+            "CREATE CONSTRAINT context_problem_name IF NOT EXISTS FOR (p:ContextProblem) REQUIRE p.name IS UNIQUE",
+        ]
+        with self.driver.session() as session:
+            for statement in statements:
+                session.run(statement)
+
+    def clear_context_graph(self):
+        """Delete only context graph nodes/relationships."""
+        with self.driver.session() as session:
+            session.run(
+                """
+                MATCH (n)
+                WHERE n:ContextDocument
+                   OR n:ContextPage
+                   OR n:ContextChunk
+                   OR n:ContextAction
+                   OR n:ContextObject
+                   OR n:ContextProblem
+                DETACH DELETE n
+                """
+            )
+
+    def create_context_graph_from_summary(
+        self,
+        summary: str,
+        document_id: str = "",
+        page_number: int = 1,
+        chunk_index: int = 1,
+        source: str = "manual",
+    ) -> Dict:
+        """
+        Create context graph nodes from one unstructured text chunk.
+        This does not update Ticket/Action/Object/Problem KG labels.
+        """
+        self.ensure_context_graph_schema()
+        extracted = self.extract_info(summary)
+
+        final_document_id = document_id.strip() or f"CTXDOC-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        page_id = f"{final_document_id}-P{int(page_number):04d}"
+        chunk_id = f"{page_id}-C{int(chunk_index):04d}"
+
+        with self.driver.session() as session:
+            session.run(
+                """
+                MERGE (d:ContextDocument {id: $document_id})
+                ON CREATE SET d.source = $source, d.created_at = datetime()
+                MERGE (p:ContextPage {id: $page_id})
+                ON CREATE SET p.page_number = $page_number
+                MERGE (d)-[:HAS_PAGE]->(p)
+                MERGE (c:ContextChunk {id: $chunk_id})
+                SET c.text = $summary,
+                    c.source = $source,
+                    c.page_number = $page_number,
+                    c.chunk_index = $chunk_index,
+                    c.updated_at = datetime()
+                MERGE (p)-[:HAS_CHUNK]->(c)
+                """,
+                document_id=final_document_id,
+                page_id=page_id,
+                page_number=int(page_number),
+                chunk_id=chunk_id,
+                summary=summary,
+                source=source,
+                chunk_index=int(chunk_index),
+            )
+
+            if extracted["action"]:
+                session.run(
+                    """
+                    MATCH (c:ContextChunk {id: $chunk_id})
+                    MERGE (a:ContextAction {name: $action})
+                    MERGE (c)-[:MENTIONS_ACTION]->(a)
+                    """,
+                    chunk_id=chunk_id,
+                    action=extracted["action"],
+                )
+
+            if extracted["object"]:
+                session.run(
+                    """
+                    MATCH (c:ContextChunk {id: $chunk_id})
+                    MERGE (o:ContextObject {name: $object})
+                    MERGE (c)-[:MENTIONS_OBJECT]->(o)
+                    """,
+                    chunk_id=chunk_id,
+                    object=extracted["object"],
+                )
+
+            if extracted["problem"]:
+                session.run(
+                    """
+                    MATCH (c:ContextChunk {id: $chunk_id})
+                    MERGE (p:ContextProblem {name: $problem})
+                    MERGE (c)-[:MENTIONS_PROBLEM]->(p)
+                    """,
+                    chunk_id=chunk_id,
+                    problem=extracted["problem"],
+                )
+
+        return {
+            "document_id": final_document_id,
+            "page_id": page_id,
+            "chunk_id": chunk_id,
+            "summary": summary,
+            "extracted": extracted,
+        }
+
+    def get_context_graph_stats(self) -> Dict:
+        """Return context graph statistics."""
+        with self.driver.session() as session:
+            document_count = session.run(
+                "MATCH (d:ContextDocument) RETURN count(d) AS c"
+            ).single()["c"]
+            page_count = session.run(
+                "MATCH (p:ContextPage) RETURN count(p) AS c"
+            ).single()["c"]
+            chunk_count = session.run(
+                "MATCH (c:ContextChunk) RETURN count(c) AS c"
+            ).single()["c"]
+            action_count = session.run(
+                "MATCH (a:ContextAction) RETURN count(a) AS c"
+            ).single()["c"]
+            object_count = session.run(
+                "MATCH (o:ContextObject) RETURN count(o) AS c"
+            ).single()["c"]
+            problem_count = session.run(
+                "MATCH (p:ContextProblem) RETURN count(p) AS c"
+            ).single()["c"]
+
+        return {
+            "document_count": document_count,
+            "page_count": page_count,
+            "chunk_count": chunk_count,
+            "action_count": action_count,
+            "object_count": object_count,
+            "problem_count": problem_count,
+        }
+
     def extract_info(self, summary: str) -> Dict:
         """Extract simple action/object/problem tags from ticket summary."""
         summary_lower = summary.lower()
