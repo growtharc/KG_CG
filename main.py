@@ -3,12 +3,14 @@ NEO4J CONTEXT GRAPH - SIMPLE DEMO (10 Tickets Only)
 """
 
 import os
+import re
 from datetime import datetime
 from typing import Dict, List
 
 import pandas as pd
 from dotenv import load_dotenv
 from neo4j import GraphDatabase
+from pypdf import PdfReader
 
 # Load environment variables from .env file
 load_dotenv()
@@ -183,6 +185,141 @@ class SimpleNeo4jDemo:
             "action_count": action_count,
             "object_count": object_count,
             "problem_count": problem_count,
+        }
+
+    def _normalize_pdf_text(self, text: str) -> str:
+        """Normalize noisy PDF text while keeping sentence meaning."""
+        cleaned = text.replace("\r", "\n")
+        cleaned = re.sub(r"[ \t]+", " ", cleaned)
+        cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+        cleaned = re.sub(r"(?i)^page\s+\d+\s*$", "", cleaned, flags=re.MULTILINE)
+        cleaned = re.sub(r"(?i)^confidential.*$", "", cleaned, flags=re.MULTILINE)
+        cleaned = re.sub(r"(?i)^copyright.*$", "", cleaned, flags=re.MULTILINE)
+        return cleaned.strip()
+
+    def _split_unstructured_text_to_chunks(self, text: str) -> List[str]:
+        """
+        Split unstructured text into context chunks.
+        Heuristics:
+        - Use blank-line blocks first
+        - Then split oversized blocks by sentence boundaries
+        """
+        blocks = [b.strip() for b in text.split("\n\n") if b.strip()]
+        chunks: List[str] = []
+
+        for block in blocks:
+            block = re.sub(r"^(\d+[\).]|[-*]|\([a-zA-Z]\))\s*", "", block).strip()
+            if len(block) < 20:
+                continue
+
+            if len(block) <= 350:
+                chunks.append(block)
+                continue
+
+            # Split long blocks by sentence-like boundaries.
+            sentences = re.split(r"(?<=[\.\?\!])\s+", block)
+            current = []
+            current_len = 0
+            for sentence in sentences:
+                sentence = sentence.strip()
+                if not sentence:
+                    continue
+                if current_len + len(sentence) + 1 > 320 and current:
+                    merged = " ".join(current).strip()
+                    if len(merged) >= 20:
+                        chunks.append(merged)
+                    current = [sentence]
+                    current_len = len(sentence)
+                else:
+                    current.append(sentence)
+                    current_len += len(sentence) + 1
+            if current:
+                merged = " ".join(current).strip()
+                if len(merged) >= 20:
+                    chunks.append(merged)
+
+        # De-duplicate while preserving order
+        unique_chunks: List[str] = []
+        seen = set()
+        for chunk in chunks:
+            key = chunk.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            unique_chunks.append(chunk)
+        return unique_chunks
+
+    def parse_unstructured_pdf_to_context_chunks(
+        self, pdf_path: str, max_chunks_per_page: int = 30
+    ) -> List[Dict]:
+        """
+        Parse PDF into page-aware context chunks.
+        Returns list of dicts with page_number, chunk_index, text.
+        """
+        reader = PdfReader(pdf_path)
+        parsed_chunks: List[Dict] = []
+
+        for page_idx, page in enumerate(reader.pages, start=1):
+            raw_text = page.extract_text() or ""
+            normalized = self._normalize_pdf_text(raw_text)
+            if not normalized:
+                continue
+
+            chunks = self._split_unstructured_text_to_chunks(normalized)
+            for chunk_idx, chunk_text in enumerate(
+                chunks[: int(max_chunks_per_page)], start=1
+            ):
+                parsed_chunks.append(
+                    {
+                        "page_number": page_idx,
+                        "chunk_index": chunk_idx,
+                        "text": chunk_text,
+                    }
+                )
+
+        return parsed_chunks
+
+    def build_context_graph_from_pdf(
+        self,
+        pdf_path: str,
+        document_id: str = "",
+        source: str = "pdf_upload",
+        max_chunks_per_page: int = 30,
+        clear_existing_context: bool = False,
+    ) -> Dict:
+        """
+        Build Context Graph from PDF only.
+        This method intentionally does not update the KG schema.
+        """
+        self.ensure_context_graph_schema()
+        if clear_existing_context:
+            self.clear_context_graph()
+
+        final_document_id = (
+            document_id.strip() or f"CTXPDF-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        )
+        parsed_chunks = self.parse_unstructured_pdf_to_context_chunks(
+            pdf_path, max_chunks_per_page=max_chunks_per_page
+        )
+
+        traces = []
+        for item in parsed_chunks:
+            trace = self.create_context_graph_from_summary(
+                summary=item["text"],
+                document_id=final_document_id,
+                page_number=int(item["page_number"]),
+                chunk_index=int(item["chunk_index"]),
+                source=source,
+            )
+            traces.append(trace)
+
+        stats = self.get_context_graph_stats()
+        return {
+            "document_id": final_document_id,
+            "processed_chunks": len(traces),
+            "parsed_chunks": parsed_chunks,
+            "sample_traces": traces[:10],
+            "context_stats": stats,
         }
 
     def extract_info(self, summary: str) -> Dict:
