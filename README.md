@@ -52,3 +52,9 @@ python .\test_api_smoke.py
 - CSV and `.env` are ignored by Git.
 - Context Graph is intentionally separated from KG updates.
 - Promotion from Context Graph to KG should happen only after user approval.
+
+## Study Guide
+
+For detailed architecture and code walkthrough notes, see:
+
+- [STUDY_GUIDE.md](/c:/Users/RadhikaAgarwal/Downloads/KG_CG/KG_CG/STUDY_GUIDE.md)
