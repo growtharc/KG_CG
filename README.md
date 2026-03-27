@@ -11,7 +11,7 @@ Context Graph + Knowledge Graph demo using Neo4j and Streamlit.
 
 ## Prerequisites
 
-- Python 3.12+
+- python version 3.12+
 - Neo4j running locally (or reachable URI)
 - A `.env` file with:
   - `NEO4J_URI`
@@ -21,30 +21,30 @@ Context Graph + Knowledge Graph demo using Neo4j and Streamlit.
 ## Setup
 
 ```powershell
-python -m venv .venv312
-.\.venv312\Scripts\Activate.ps1
+python -m venv fresh_env
+.\fresh_env\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
 ## Run Streamlit app
 
 ```powershell
-.\.venv312\Scripts\Activate.ps1
-streamlit run .\ui\streamlit_app.py
+.\fresh_env\Scripts\Activate.ps1
+streamlit run .\streamlit_app.py
 ```
 
 ## Run FastAPI (hardcoded backend mode)
 
 ```powershell
-.\.venv312\Scripts\Activate.ps1
-uvicorn api.api_app:app --host 127.0.0.1 --port 8000 --reload
+.\fresh_env\Scripts\Activate.ps1
+uvicorn api_app:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 ## Test API endpoints
 
 ```powershell
-.\.venv312\Scripts\Activate.ps1
-python .\tests\test_api_smoke.py
+.\fresh_env\Scripts\Activate.ps1
+python .\test_api_smoke.py
 ```
 
 ## Notes
@@ -53,8 +53,4 @@ python .\tests\test_api_smoke.py
 - Context Graph is intentionally separated from KG updates.
 - Promotion from Context Graph to KG should happen only after user approval.
 
-## Study Guide
 
-For detailed architecture and code walkthrough notes, see:
-
-- [STUDY_GUIDE.md](/c:/Users/RadhikaAgarwal/Downloads/KG_CG/KG_CG/STUDY_GUIDE.md)
