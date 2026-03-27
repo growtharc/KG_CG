@@ -39,7 +39,7 @@ graph = get_graph()
 
 with st.sidebar:
     st.subheader("Data Setup")
-    csv_path = st.text_input("CSV path", value="Jira last 6 months.csv")
+    csv_path = st.text_input("CSV path", value="data/Jira last 6 months.csv")
     limit = st.number_input("Sample size", min_value=1, max_value=5000, value=10, step=1)
     clear_existing = st.checkbox("Clear existing graph before load", value=True)
 

@@ -51,7 +51,7 @@ class SimpleNeo4jDemo:
 
     def load_sample_tickets(
         self,
-        csv_path: str = "Jira last 6 months.csv",
+        csv_path: str = "data/Jira last 6 months.csv",
         limit: int = 10,
         clear_existing: bool = True,
     ) -> int:

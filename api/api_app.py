@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 
-from api_schemas import (
+from api.api_schemas import (
     ContextManualIngestRequest,
     SampleLoadRequest,
     TicketAnalyzeRequest,

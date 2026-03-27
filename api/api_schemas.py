@@ -10,7 +10,7 @@ class TicketAnalyzeRequest(BaseModel):
 
 class SampleLoadRequest(BaseModel):
     limit: int = Field(default=10, ge=1, le=5000)
-    csv_path: str = Field(default="Jira last 6 months.csv")
+    csv_path: str = Field(default="data/Jira last 6 months.csv")
 
 
 class ContextManualIngestRequest(BaseModel):
