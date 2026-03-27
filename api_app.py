@@ -80,6 +80,8 @@ async def ingest_context_pdf(
     document_id: str = Query(default=""),
     source: str = Query(default="pdf_upload"),
     max_chunks_per_page: int = Query(default=30, ge=1, le=200),
+    chunk_size: int = Query(default=200, ge=50, le=2000),
+    chunk_overlap: int = Query(default=40, ge=0, le=500),
     clear_existing_context: bool = Query(default=False),
 ):
     if file.content_type != "application/pdf":
@@ -96,6 +98,8 @@ async def ingest_context_pdf(
             document_id=document_id,
             source=source,
             max_chunks_per_page=max_chunks_per_page,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
             clear_existing_context=clear_existing_context,
         )
     except Exception as exc:

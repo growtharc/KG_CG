@@ -4,13 +4,16 @@ NEO4J CONTEXT GRAPH - SIMPLE DEMO (10 Tickets Only)
 
 import os
 import re
+from collections import defaultdict
 from datetime import datetime
 from typing import Dict, List
 
 import pandas as pd
 from dotenv import load_dotenv
 from neo4j import GraphDatabase
-from pypdf import PdfReader
+
+DEFAULT_CHUNK_SIZE = 200
+DEFAULT_CHUNK_OVERLAP = 40
 
 # Load environment variables from .env file
 load_dotenv()
@@ -250,32 +253,62 @@ class SimpleNeo4jDemo:
         return unique_chunks
 
     def parse_unstructured_pdf_to_context_chunks(
-        self, pdf_path: str, max_chunks_per_page: int = 30
+        self,
+        pdf_path: str,
+        max_chunks_per_page: int = 30,
+        chunk_size: int = DEFAULT_CHUNK_SIZE,
+        chunk_overlap: int = DEFAULT_CHUNK_OVERLAP,
     ) -> List[Dict]:
         """
         Parse PDF into page-aware context chunks.
         Returns list of dicts with page_number, chunk_index, text.
         """
-        reader = PdfReader(pdf_path)
-        parsed_chunks: List[Dict] = []
+        try:
+            # Keep imports local so API startup remains lightweight and explicit.
+            from langchain_community.document_loaders import PyPDFLoader
+            from langchain_text_splitters import RecursiveCharacterTextSplitter
+        except ImportError as exc:
+            raise ImportError(
+                "PDF chunking requires langchain-community and langchain-text-splitters."
+            ) from exc
 
-        for page_idx, page in enumerate(reader.pages, start=1):
-            raw_text = page.extract_text() or ""
-            normalized = self._normalize_pdf_text(raw_text)
-            if not normalized:
+        loader = PyPDFLoader(pdf_path)
+        pages = loader.load_and_split()
+        if not pages:
+            return []
+
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=int(chunk_size),
+            chunk_overlap=int(chunk_overlap),
+        )
+        docs = splitter.split_documents(pages)
+
+        parsed_chunks: List[Dict] = []
+        per_page_counts = defaultdict(int)
+        seen = set()
+
+        for doc in docs:
+            page_number = int(doc.metadata.get("page", 0)) + 1
+            if per_page_counts[page_number] >= int(max_chunks_per_page):
                 continue
 
-            chunks = self._split_unstructured_text_to_chunks(normalized)
-            for chunk_idx, chunk_text in enumerate(
-                chunks[: int(max_chunks_per_page)], start=1
-            ):
-                parsed_chunks.append(
-                    {
-                        "page_number": page_idx,
-                        "chunk_index": chunk_idx,
-                        "text": chunk_text,
-                    }
-                )
+            text = (doc.page_content or "").replace("\n", " ").strip()
+            if not text:
+                continue
+
+            dedup_key = (page_number, text.lower())
+            if dedup_key in seen:
+                continue
+            seen.add(dedup_key)
+
+            per_page_counts[page_number] += 1
+            parsed_chunks.append(
+                {
+                    "page_number": page_number,
+                    "chunk_index": per_page_counts[page_number],
+                    "text": text,
+                }
+            )
 
         return parsed_chunks
 
@@ -285,6 +318,8 @@ class SimpleNeo4jDemo:
         document_id: str = "",
         source: str = "pdf_upload",
         max_chunks_per_page: int = 30,
+        chunk_size: int = DEFAULT_CHUNK_SIZE,
+        chunk_overlap: int = DEFAULT_CHUNK_OVERLAP,
         clear_existing_context: bool = False,
     ) -> Dict:
         """
@@ -299,7 +334,10 @@ class SimpleNeo4jDemo:
             document_id.strip() or f"CTXPDF-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         )
         parsed_chunks = self.parse_unstructured_pdf_to_context_chunks(
-            pdf_path, max_chunks_per_page=max_chunks_per_page
+            pdf_path,
+            max_chunks_per_page=max_chunks_per_page,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
         )
 
         traces = []
@@ -319,6 +357,11 @@ class SimpleNeo4jDemo:
             "processed_chunks": len(traces),
             "parsed_chunks": parsed_chunks,
             "sample_traces": traces[:10],
+            "chunking_config": {
+                "chunk_size": int(chunk_size),
+                "chunk_overlap": int(chunk_overlap),
+                "max_chunks_per_page": int(max_chunks_per_page),
+            },
             "context_stats": stats,
         }
 

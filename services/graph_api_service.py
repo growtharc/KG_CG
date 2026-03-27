@@ -62,6 +62,8 @@ class GraphApiService:
         document_id: str,
         source: str,
         max_chunks_per_page: int,
+        chunk_size: int,
+        chunk_overlap: int,
         clear_existing_context: bool,
     ) -> Dict:
         with NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
@@ -74,6 +76,8 @@ class GraphApiService:
                 document_id=document_id,
                 source=source,
                 max_chunks_per_page=max_chunks_per_page,
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
                 clear_existing_context=clear_existing_context,
             )
         finally:
