@@ -7,3 +7,5 @@ pypdf
 fastapi
 uvicorn
 python-multipart
+langchain-community
+langchain-text-splitters
