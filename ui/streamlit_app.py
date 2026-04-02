@@ -3,6 +3,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+import pandas as pd
 import streamlit as st
 
 # Ensure repo root is importable when running `streamlit run ui/streamlit_app.py`.
@@ -51,12 +52,36 @@ with st.sidebar:
     st.subheader("Data Setup")
     clear_existing = st.checkbox("Clear existing graph before load", value=True)
 
-    if st.button("Load Sample Tickets", use_container_width=True):
+    if st.button("Load Hardcoded Sample Tickets", use_container_width=True):
         try:
             loaded = graph.load_hardcoded_tickets(clear_existing=clear_existing)
             st.success(f"Loaded {loaded} tickets and created similarity links.")
         except Exception as exc:
             st.error(f"Load failed: {exc}")
+
+    st.markdown("---")
+    st.subheader("Load from CSV")
+    default_csv = "data/rca_onboarding_tickets.csv"
+    csv_path = st.text_input("CSV path", value=default_csv)
+    csv_limit = st.number_input("Max rows to load", min_value=1, max_value=5000, value=10, step=1)
+
+    if st.button("Load CSV into KG", use_container_width=True):
+        try:
+            df = pd.read_csv(csv_path)
+            if clear_existing:
+                graph.clear_all()
+            loaded_count = 0
+            for _, row in df.head(int(csv_limit)).iterrows():
+                ticket_id = str(row.get("issue_key", f"CSV-{loaded_count+1}"))
+                summary = str(row.get("summary", ""))
+                resolution = str(row.get("recommendation", "")) or None
+                if summary:
+                    graph.add_ticket(ticket_id, summary, resolution)
+                    loaded_count += 1
+            graph.create_similarity_links()
+            st.success(f"Loaded {loaded_count} tickets from CSV.")
+        except Exception as exc:
+            st.error(f"CSV load failed: {exc}")
 
 st.subheader("Current Graph Stats")
 try:
@@ -69,8 +94,9 @@ st.divider()
 st.subheader("Context Graph Builder")
 st.caption("Create context graph nodes from unstructured text. This does not update the KG.")
 
-st.markdown("**PDF -> Context Graph (No KG update)**")
-uploaded_pdf = st.file_uploader("Upload unstructured PDF", type=["pdf"])
+st.markdown("**Upload Unstructured Document (PDF) → Context Graph**")
+st.caption("Use this to ingest RCA documents, runbooks, or any unstructured PDF. Chunks are extracted and linked to domain entities in the Context Graph.")
+uploaded_pdf = st.file_uploader("Upload PDF (e.g. RCA-Onboarding-Tickets.pdf)", type=["pdf"])
 pdf_document_id = st.text_input("PDF context document ID (optional)", value="")
 pdf_max_chunks_per_page = st.number_input(
     "Max chunks per page", min_value=1, max_value=200, value=30, step=1
