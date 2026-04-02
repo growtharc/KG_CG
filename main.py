@@ -1,8 +1,8 @@
 """
-NEO4J CONTEXT GRAPH - SIMPLE DEMO (10 Tickets Only)
+NEO4J CONTEXT GRAPH - DOMAIN-AWARE DEMO (Salesforce/Jira Tickets)
 """
 
-from typing import Dict
+from typing import Dict, List
 
 from backend.common import extract_info, get_routing
 from backend.connection import create_driver
@@ -33,13 +33,16 @@ class SimpleNeo4jDemo:
     def get_routing(self, info: Dict) -> str:
         return get_routing(info)
 
+    # ------------------------------------------------------------------
     # KG methods
+    # ------------------------------------------------------------------
+
     def clear_all(self):
         self.kg.clear_all()
         print("Database cleared")
 
-    def add_ticket(self, ticket_id: str, summary: str):
-        self.kg.add_ticket(ticket_id, summary)
+    def add_ticket(self, ticket_id: str, summary: str, resolution: str = None):
+        self.kg.add_ticket(ticket_id, summary, resolution)
         print(f"Added: {ticket_id}")
 
     def add_ticket_with_trace(self, summary: str, ticket_id: str = "") -> Dict:
@@ -49,13 +52,20 @@ class SimpleNeo4jDemo:
         self.kg.create_similarity_links()
         print("Created similarity links")
 
+    def load_hardcoded_tickets(self, clear_existing: bool = True) -> int:
+        return self.kg.load_hardcoded_tickets(clear_existing=clear_existing)
+
+    # Backward-compat shim
     def load_sample_tickets(
         self,
-        csv_path: str = "data/Jira last 6 months.csv",
+        csv_path: str = "",
         limit: int = 10,
         clear_existing: bool = True,
     ) -> int:
-        return self.kg.load_sample_tickets(csv_path, limit, clear_existing)
+        return self.kg.load_hardcoded_tickets(clear_existing=clear_existing)
+
+    def score_and_rank(self, summary: str, top_k: int = 3) -> List[Dict]:
+        return self.kg.score_and_rank(summary, top_k=top_k)
 
     def query_similar_tickets(self, new_ticket_summary: str, top_k: int = 3) -> Dict:
         return self.kg.query_similar_tickets(new_ticket_summary, top_k=top_k)
@@ -66,44 +76,42 @@ class SimpleNeo4jDemo:
     def show_graph_stats(self):
         stats = self.get_graph_stats()
         print("\nGRAPH STATISTICS:")
-        print(f"  Tickets: {stats['ticket_count']}")
-        print(f"  Actions: {stats['action_count']}")
-        print(f"  Objects: {stats['object_count']}")
-        print(f"  Similarity Links: {stats['similarity_count']}")
+        print(f"  Tickets:         {stats['ticket_count']}")
+        print(f"  Issue Types:     {stats['issue_type_count']}")
+        print(f"  SF Objects:      {stats['object_count']}")
+        print(f"  Actions:         {stats['action_count']}")
+        print(f"  Resolutions:     {stats['resolution_count']}")
+        print(f"  Similarity Links:{stats['similarity_count']}")
 
     def find_similar_tickets(self, new_ticket_summary: str, top_k: int = 3):
         results = self.query_similar_tickets(new_ticket_summary, top_k=top_k)
-        new_info = results["extracted"]
+        extracted = results["extracted"]
 
         print("\n" + "=" * 80)
         print(f"NEW TICKET: {new_ticket_summary}")
         print("=" * 80)
         print("\nExtracted:")
-        print(f"  Action: {new_info['action']}")
-        print(f"  Object: {new_info['object']}")
-        print(f"  Problem: {new_info['problem']}")
+        print(f"  Action:     {extracted['action']}")
+        print(f"  Object:     {extracted['object']}")
+        print(f"  Issue Type: {extracted['issue_type']}")
+        print(f"  Resolution: {extracted['resolution']}")
 
-        exact_matches = results["exact_matches"]
-        if new_info["action"] and new_info["object"]:
-            if exact_matches:
-                print(
-                    f"\nFound {len(exact_matches)} similar tickets (Same Action + Object):"
-                )
-                for i, record in enumerate(exact_matches, 1):
-                    print(f"  {i}. {record['id']}")
-                    print(f"     {record['summary'][:70]}...")
-            else:
-                print("\nNo exact matches found")
-
-        if new_info["action"]:
-            print(f"\nTickets with same ACTION ({new_info['action']}):")
-            for i, record in enumerate(results["action_matches"], 1):
-                print(f"  {i}. {record['id']}: {record['summary'][:60]}...")
+        ranked = results.get("ranked_resolutions", [])
+        if ranked:
+            print(f"\nTop Suggested Resolutions:")
+            for i, r in enumerate(ranked, 1):
+                print(f"  {i}. {r['resolution']} (score: {r['score']})")
+                print(f"     {r['explanation']}")
+        else:
+            print("\nNo resolution suggestions found.")
 
         print(f"\nROUTING SUGGESTION: {results['routing']}")
         print("=" * 80 + "\n")
 
+    # ------------------------------------------------------------------
     # Context methods
+    # ------------------------------------------------------------------
+
     def ensure_context_graph_schema(self):
         self.context.ensure_context_graph_schema()
 
@@ -185,11 +193,11 @@ def interactive_mode(graph: SimpleNeo4jDemo):
 
 def main():
     print("=" * 80)
-    print("NEO4J CONTEXT GRAPH - SIMPLE DEMO (10 Tickets)")
+    print("NEO4J CONTEXT GRAPH - DOMAIN-AWARE DEMO")
     print("=" * 80)
 
     graph = SimpleNeo4jDemo()
-    graph.load_sample_tickets(limit=10, clear_existing=True)
+    graph.load_hardcoded_tickets(clear_existing=True)
     graph.show_graph_stats()
 
     print("\n" + "=" * 80)
