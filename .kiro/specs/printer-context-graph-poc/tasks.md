@@ -147,7 +147,7 @@ Refactor the existing Neo4j ticket context graph demo to use a richer, domain-sp
     - Tag: `# Feature: printer-context-graph-poc, Property 7: context chunk round-trip — MENTIONS_ISSUE_TYPE relationship`
     - **Validates: Requirements R3.2**
 
-- [-] 8. Final checkpoint — ensure all tests pass
+- [x] 8. Final checkpoint — ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

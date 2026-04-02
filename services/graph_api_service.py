@@ -17,12 +17,8 @@ class GraphApiService:
             "context": self.graph.get_context_graph_stats(),
         }
 
-    def load_sample_tickets(self, limit: int, csv_path: str = "Jira last 6 months.csv") -> Dict:
-        loaded = self.graph.load_sample_tickets(
-            csv_path=csv_path,
-            limit=limit,
-            clear_existing=True,
-        )
+    def load_sample_tickets(self, limit: int = 10, csv_path: str = "") -> Dict:
+        loaded = self.graph.load_hardcoded_tickets(clear_existing=True)
         return {
             "message": "Sample tickets loaded.",
             "loaded": loaded,
@@ -36,8 +32,9 @@ class GraphApiService:
             "top_k": top_k,
             "extracted": result["extracted"],
             "routing": result["routing"],
-            "exact_matches": result["exact_matches"],
-            "action_matches": result["action_matches"],
+            "ranked_resolutions": result.get("ranked_resolutions", []),
+            "issue_type_matches": result.get("exact_matches", []),
+            "action_matches": result.get("action_matches", []),
         }
 
     def ingest_context_manual(
@@ -81,13 +78,9 @@ class GraphApiService:
                 clear_existing_context=clear_existing_context,
             )
         finally:
-            try:
-                import os
-
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
-            except OSError:
-                pass
+            import os
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
 
     def clear_context_graph(self) -> Dict:
         self.graph.clear_context_graph()
