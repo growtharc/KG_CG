@@ -12,19 +12,21 @@ class ContextGraphService:
         self.extract_info = extract_info_fn
 
     def ensure_context_graph_schema(self):
+        """Create uniqueness constraints for domain-aware context node types."""
         statements = [
             "CREATE CONSTRAINT context_document_id IF NOT EXISTS FOR (d:ContextDocument) REQUIRE d.id IS UNIQUE",
             "CREATE CONSTRAINT context_page_id IF NOT EXISTS FOR (p:ContextPage) REQUIRE p.id IS UNIQUE",
             "CREATE CONSTRAINT context_chunk_id IF NOT EXISTS FOR (c:ContextChunk) REQUIRE c.id IS UNIQUE",
-            "CREATE CONSTRAINT context_action_name IF NOT EXISTS FOR (a:ContextAction) REQUIRE a.name IS UNIQUE",
-            "CREATE CONSTRAINT context_object_name IF NOT EXISTS FOR (o:ContextObject) REQUIRE o.name IS UNIQUE",
-            "CREATE CONSTRAINT context_problem_name IF NOT EXISTS FOR (p:ContextProblem) REQUIRE p.name IS UNIQUE",
+            "CREATE CONSTRAINT ctx_issue_type_name IF NOT EXISTS FOR (i:ContextIssueType) REQUIRE i.name IS UNIQUE",
+            "CREATE CONSTRAINT ctx_sf_object_name IF NOT EXISTS FOR (o:ContextSalesforceObject) REQUIRE o.name IS UNIQUE",
+            "CREATE CONSTRAINT ctx_resolution_name IF NOT EXISTS FOR (r:ContextResolution) REQUIRE r.name IS UNIQUE",
         ]
         with self.driver.session() as session:
-            for statement in statements:
-                session.run(statement)
+            for stmt in statements:
+                session.run(stmt)
 
     def clear_context_graph(self):
+        """Delete all context graph nodes (new and legacy labels)."""
         with self.driver.session() as session:
             session.run(
                 """
@@ -32,6 +34,9 @@ class ContextGraphService:
                 WHERE n:ContextDocument
                    OR n:ContextPage
                    OR n:ContextChunk
+                   OR n:ContextIssueType
+                   OR n:ContextSalesforceObject
+                   OR n:ContextResolution
                    OR n:ContextAction
                    OR n:ContextObject
                    OR n:ContextProblem
@@ -79,35 +84,35 @@ class ContextGraphService:
                 chunk_index=int(chunk_index),
             )
 
-            if extracted["action"]:
+            if extracted.get("issue_type"):
                 session.run(
                     """
                     MATCH (c:ContextChunk {id: $chunk_id})
-                    MERGE (a:ContextAction {name: $action})
-                    MERGE (c)-[:MENTIONS_ACTION]->(a)
+                    MERGE (i:ContextIssueType {name: $name})
+                    MERGE (c)-[:MENTIONS_ISSUE_TYPE]->(i)
                     """,
                     chunk_id=chunk_id,
-                    action=extracted["action"],
+                    name=extracted["issue_type"],
                 )
-            if extracted["object"]:
+            if extracted.get("object"):
                 session.run(
                     """
                     MATCH (c:ContextChunk {id: $chunk_id})
-                    MERGE (o:ContextObject {name: $object})
+                    MERGE (o:ContextSalesforceObject {name: $name})
                     MERGE (c)-[:MENTIONS_OBJECT]->(o)
                     """,
                     chunk_id=chunk_id,
-                    object=extracted["object"],
+                    name=extracted["object"],
                 )
-            if extracted["problem"]:
+            if extracted.get("resolution"):
                 session.run(
                     """
                     MATCH (c:ContextChunk {id: $chunk_id})
-                    MERGE (p:ContextProblem {name: $problem})
-                    MERGE (c)-[:MENTIONS_PROBLEM]->(p)
+                    MERGE (r:ContextResolution {name: $name})
+                    MERGE (c)-[:MENTIONS_RESOLUTION]->(r)
                     """,
                     chunk_id=chunk_id,
-                    problem=extracted["problem"],
+                    name=extracted["resolution"],
                 )
 
         return {
@@ -129,23 +134,23 @@ class ContextGraphService:
             chunk_count = session.run(
                 "MATCH (c:ContextChunk) RETURN count(c) AS c"
             ).single()["c"]
-            action_count = session.run(
-                "MATCH (a:ContextAction) RETURN count(a) AS c"
+            issue_type_count = session.run(
+                "MATCH (i:ContextIssueType) RETURN count(i) AS c"
             ).single()["c"]
             object_count = session.run(
-                "MATCH (o:ContextObject) RETURN count(o) AS c"
+                "MATCH (o:ContextSalesforceObject) RETURN count(o) AS c"
             ).single()["c"]
-            problem_count = session.run(
-                "MATCH (p:ContextProblem) RETURN count(p) AS c"
+            resolution_count = session.run(
+                "MATCH (r:ContextResolution) RETURN count(r) AS c"
             ).single()["c"]
 
         return {
             "document_count": document_count,
             "page_count": page_count,
             "chunk_count": chunk_count,
-            "action_count": action_count,
+            "issue_type_count": issue_type_count,
             "object_count": object_count,
-            "problem_count": problem_count,
+            "resolution_count": resolution_count,
         }
 
     def parse_unstructured_pdf_to_context_chunks(
