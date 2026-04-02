@@ -61,9 +61,9 @@ with st.sidebar:
 
     st.markdown("---")
     st.subheader("Load from CSV")
-    default_csv = "data/rca_onboarding_tickets.csv"
+    default_csv = "data/jira_tickets.csv"
     csv_path = st.text_input("CSV path", value=default_csv)
-    csv_limit = st.number_input("Max rows to load", min_value=1, max_value=5000, value=10, step=1)
+    csv_limit = st.number_input("Max rows to load", min_value=1, max_value=5000, value=50, step=1)
 
     if st.button("Load CSV into KG", use_container_width=True):
         try:
@@ -72,14 +72,15 @@ with st.sidebar:
                 graph.clear_all()
             loaded_count = 0
             for _, row in df.head(int(csv_limit)).iterrows():
-                ticket_id = str(row.get("issue_key", f"CSV-{loaded_count+1}"))
-                summary = str(row.get("summary", ""))
-                resolution = str(row.get("recommendation", "")) or None
+                # support both column name styles
+                ticket_id = str(row.get("Issue key", row.get("issue_key", f"CSV-{loaded_count+1}")))
+                summary = str(row.get("Summary", row.get("summary", "")))
+                resolution = None
                 if summary:
                     graph.add_ticket(ticket_id, summary, resolution)
                     loaded_count += 1
             graph.create_similarity_links()
-            st.success(f"Loaded {loaded_count} tickets from CSV.")
+            st.success(f"Loaded {loaded_count} tickets from CSV and created similarity links.")
         except Exception as exc:
             st.error(f"CSV load failed: {exc}")
 
