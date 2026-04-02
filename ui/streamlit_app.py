@@ -15,7 +15,7 @@ from main import SimpleNeo4jDemo
 
 st.set_page_config(page_title="Neo4j Ticket Context", layout="wide")
 st.title("Neo4j Ticket Context Graph")
-st.caption("Basic Streamlit UI for loading sample tickets and finding similar tickets.")
+st.caption("Salesforce/Jira support ticket graph — domain-aware schema with resolution scoring.")
 
 
 @st.cache_resource
@@ -24,11 +24,14 @@ def get_graph():
 
 
 def render_stats(stats):
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
     col1.metric("Tickets", stats["ticket_count"])
-    col2.metric("Actions", stats["action_count"])
-    col3.metric("Objects", stats["object_count"])
-    col4.metric("Similarity Links", stats["similarity_count"])
+    col2.metric("Issue Types", stats["issue_type_count"])
+    col3.metric("Resolutions", stats["resolution_count"])
+    col4, col5, col6 = st.columns(3)
+    col4.metric("SF Objects", stats["object_count"])
+    col5.metric("Actions", stats["action_count"])
+    col6.metric("Similarity Links", stats["similarity_count"])
 
 
 def render_context_stats(stats):
@@ -37,26 +40,20 @@ def render_context_stats(stats):
     col2.metric("Context Pages", stats["page_count"])
     col3.metric("Context Chunks", stats["chunk_count"])
     col4, col5, col6 = st.columns(3)
-    col4.metric("Context Actions", stats["action_count"])
-    col5.metric("Context Objects", stats["object_count"])
-    col6.metric("Context Problems", stats["problem_count"])
+    col4.metric("Context Issue Types", stats["issue_type_count"])
+    col5.metric("Context SF Objects", stats["object_count"])
+    col6.metric("Context Resolutions", stats["resolution_count"])
 
 
 graph = get_graph()
 
 with st.sidebar:
     st.subheader("Data Setup")
-    csv_path = st.text_input("CSV path", value="data/Jira last 6 months.csv")
-    limit = st.number_input("Sample size", min_value=1, max_value=5000, value=10, step=1)
     clear_existing = st.checkbox("Clear existing graph before load", value=True)
 
     if st.button("Load Sample Tickets", use_container_width=True):
         try:
-            loaded = graph.load_sample_tickets(
-                csv_path=csv_path,
-                limit=int(limit),
-                clear_existing=clear_existing,
-            )
+            loaded = graph.load_hardcoded_tickets(clear_existing=clear_existing)
             st.success(f"Loaded {loaded} tickets and created similarity links.")
         except Exception as exc:
             st.error(f"Load failed: {exc}")
@@ -113,9 +110,9 @@ if st.button("Build Context Graph From PDF", use_container_width=True):
                     {
                         "chunk_id": t["chunk_id"],
                         "page_id": t["page_id"],
-                        "action": t["extracted"]["action"],
-                        "object": t["extracted"]["object"],
-                        "problem": t["extracted"]["problem"],
+                        "issue_type": t["extracted"].get("issue_type"),
+                        "object": t["extracted"].get("object"),
+                        "resolution": t["extracted"].get("resolution"),
                     }
                     for t in pdf_result["sample_traces"]
                 ],
@@ -134,9 +131,7 @@ context_summary = st.text_area(
     value="Delete duplicate opportunity record for ACME account",
     height=90,
 )
-context_document_id = st.text_input(
-    "Context document ID (optional)", value=""
-)
+context_document_id = st.text_input("Context document ID (optional)", value="")
 ctx_col1, ctx_col2, ctx_col3 = st.columns(3)
 with ctx_col1:
     context_page_number = st.number_input("Page", min_value=1, max_value=10000, value=1, step=1)
@@ -204,19 +199,30 @@ if st.button("Analyze Ticket", type="primary"):
             extracted = result["extracted"]
 
             st.markdown("**Extracted Info**")
-            e1, e2, e3 = st.columns(3)
+            e1, e2, e3, e4 = st.columns(4)
             e1.write(f"Action: `{extracted['action']}`")
             e2.write(f"Object: `{extracted['object']}`")
-            e3.write(f"Problem: `{extracted['problem']}`")
+            e3.write(f"Issue Type: `{extracted['issue_type']}`")
+            e4.write(f"Resolution: `{extracted['resolution']}`")
 
             st.markdown("**Routing Suggestion**")
             st.info(result["routing"])
 
-            st.markdown("**Exact Matches (Same Action + Object)**")
+            ranked = result.get("ranked_resolutions", [])
+            st.markdown("**Ranked Resolution Suggestions**")
+            if ranked:
+                for i, r in enumerate(ranked, 1):
+                    with st.expander(f"{i}. {r['resolution']} — score: {r['score']}", expanded=(i == 1)):
+                        st.write(r["explanation"])
+                        st.write(f"Supporting tickets: `{', '.join(r['supporting_tickets'])}`")
+            else:
+                st.write("No resolution suggestions found.")
+
+            st.markdown("**Issue Type Matches**")
             if result["exact_matches"]:
                 st.dataframe(result["exact_matches"], use_container_width=True)
             else:
-                st.write("No exact matches found.")
+                st.write("No issue type matches found.")
 
             st.markdown("**Action Matches**")
             if result["action_matches"]:
@@ -255,10 +261,11 @@ if st.button("Trace Context to KG"):
 
             st.success(f"Ticket inserted: `{trace['ticket_id']}`")
             st.markdown("**Extracted Context**")
-            c1, c2, c3 = st.columns(3)
+            c1, c2, c3, c4 = st.columns(4)
             c1.write(f"Action: `{trace['extracted']['action']}`")
             c2.write(f"Object: `{trace['extracted']['object']}`")
-            c3.write(f"Problem: `{trace['extracted']['problem']}`")
+            c3.write(f"Issue Type: `{trace['extracted']['issue_type']}`")
+            c4.write(f"Resolution: `{trace['extracted']['resolution']}`")
 
             st.markdown("**Routing Decision**")
             st.info(trace["routing"])
