@@ -168,7 +168,7 @@ st.markdown("---")
 
 context_summary = st.text_area(
     "Unstructured text chunk",
-    value="Customer reported that after the Q4 migration, duplicate opportunity records were created in Salesforce for the ACME Corp account. The primary opportunity (OPP-2024-001) shows $250K ARR while the duplicate (OPP-2024-002) shows $0. Sales team cannot proceed with contract renewal until this is resolved. Need to merge or delete the duplicate record and ensure data integrity across related objects including quotes and contacts.",
+    value="Customer reported that after the Q4 migration, duplicate opportunity records were created in Salesforce for the ACME Corp account. The primary opportunity (OPP-2024-001) shows $250K ARR while the duplicate (OPP-2024-002) shows $0 but contains critical contact associations from the legacy system. Sales team cannot proceed with contract renewal until this is resolved. Need to perform intelligent merge: consolidate both records by transferring all contact relationships, activity history, and notes from duplicate to primary, recalculate opportunity stage based on combined data, update forecasting categories, preserve audit trail for compliance, and trigger automated notifications to account team. Must also validate that related quote objects, contract amendments, and payment schedules are correctly linked after merge operation.",
     height=90,
 )
 context_document_id = st.text_input("Context document ID (optional)", value="")
@@ -225,7 +225,7 @@ st.divider()
 st.subheader("Find Similar Tickets")
 ticket_summary = st.text_area(
     "New ticket summary",
-    value="Urgent: Multiple duplicate payment opportunity records detected for XYZ Corp after system integration. Primary opportunity OPP-2024-156 ($180K) is correct, but duplicates OPP-2024-157 and OPP-2024-158 are causing confusion in sales pipeline reporting. Finance team blocked from processing Q1 invoices. Requires immediate cleanup of duplicate records and validation of associated payment schedules and contract terms.",
+    value="Urgent: Need to reconcile and merge multiple payment opportunity records for XYZ Corp after system integration. Primary opportunity OPP-2024-156 ($180K) contains correct contract terms, but duplicates OPP-2024-157 ($90K partial) and OPP-2024-158 ($0 placeholder) have fragmented contact associations and activity history. Finance team blocked from processing Q1 invoices. Requires data consolidation: merge contact relationships, preserve all activity logs, update revenue forecasts, recalculate pipeline metrics, and notify stakeholders of the canonical record. Must validate payment schedules, contract terms, and related quote objects are properly linked after merge.",
     height=100,
 )
 top_k = st.slider("Top K results", min_value=1, max_value=10, value=3)
@@ -277,7 +277,7 @@ st.subheader("Context -> Knowledge Graph Flow")
 st.caption("Insert one ticket and inspect how extracted context is written into Neo4j.")
 
 st.markdown(
-    "**Suggested test ticket summary:** `Post-migration data cleanup required for enterprise customer account with multiple duplicate records affecting sales operations`"
+    "**Suggested test ticket summary:** `Post-migration data reconciliation required for enterprise customer account with complex multi-object dependencies`"
 )
 
 trace_ticket_id = st.text_input(
@@ -285,7 +285,7 @@ trace_ticket_id = st.text_input(
 )
 trace_summary = st.text_area(
     "Ticket summary for context -> KG trace",
-    value="Post-migration issue: Customer Success team reports that the enterprise account for ACME Industries has duplicate opportunity records created during the Salesforce data migration from legacy CRM. The duplicate opportunities (3 total) are causing incorrect revenue forecasting and preventing the renewal workflow from completing. Primary opportunity shows correct $500K ARR, but duplicates show partial data. Need to identify the canonical record, merge or delete duplicates, and verify all related objects (contacts, quotes, activities) are properly linked.",
+    value="Post-migration issue: Customer Success team reports that the enterprise account for ACME Industries has duplicate opportunity records created during the Salesforce data migration from legacy CRM. The duplicate opportunities (3 total) are causing incorrect revenue forecasting and preventing the renewal workflow from completing. Primary opportunity shows correct $500K ARR, but duplicates contain partial contact associations and historical activity data. Need to perform comprehensive data reconciliation: identify canonical record based on data completeness score, merge duplicate records while preserving all contact relationships and activity history, recalculate revenue attribution across fiscal quarters, update related quote and contract objects, trigger workflow re-evaluation, and generate audit trail for compliance. Must coordinate with Finance and Sales Ops teams before executing merge to ensure no data loss.",
     height=90,
 )
 
