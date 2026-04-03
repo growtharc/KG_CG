@@ -21,7 +21,20 @@ st.caption("Salesforce/Jira support ticket graph — domain-aware schema with re
 
 @st.cache_resource
 def get_graph():
-    return SimpleNeo4jDemo()
+    try:
+        return SimpleNeo4jDemo()
+    except ConnectionError as e:
+        st.error(f"**Neo4j connection failed**\n\n{e}")
+        st.info(
+            "**To fix this:**\n"
+            "1. Open Neo4j Desktop and make sure your database is **Started** (green Active status)\n"
+            "2. Check that `NEO4J_PASSWORD` in your `.env` file matches the database password\n"
+            "3. Restart Streamlit after fixing the password"
+        )
+        st.stop()
+    except Exception as e:
+        st.error(f"**Unexpected error connecting to Neo4j:** {e}")
+        st.stop()
 
 
 def render_stats(stats):
@@ -89,7 +102,7 @@ try:
     stats = graph.get_graph_stats()
     render_stats(stats)
 except Exception as exc:
-    st.warning(f"Could not fetch graph stats yet: {exc}")
+    st.warning(f"Graph stats unavailable — load tickets first using the sidebar button.")
 
 st.divider()
 st.subheader("Context Graph Builder")
@@ -201,7 +214,7 @@ try:
     context_stats = graph.get_context_graph_stats()
     render_context_stats(context_stats)
 except Exception as exc:
-    st.warning(f"Could not fetch context graph stats: {exc}")
+    st.warning("Context graph stats unavailable — build a context node first.")
 
 if "last_context_trace" in st.session_state:
     last_context_trace = st.session_state["last_context_trace"]
