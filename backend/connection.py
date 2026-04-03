@@ -18,6 +18,7 @@ def create_driver(max_retries: int = 3, retry_delay: float = 2.0):
     uri = os.getenv("NEO4J_URI", "neo4j://127.0.0.1:7687")
     user = os.getenv("NEO4J_USER", "neo4j")
     password = os.getenv("NEO4J_PASSWORD")
+    database = os.getenv("NEO4J_DATABASE", "neo4j")
 
     if not password:
         raise ValueError(

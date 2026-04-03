@@ -168,7 +168,7 @@ st.markdown("---")
 
 context_summary = st.text_area(
     "Unstructured text chunk",
-    value="Delete duplicate opportunity record for ACME account",
+    value="Customer reported that after the Q4 migration, duplicate opportunity records were created in Salesforce for the ACME Corp account. The primary opportunity (OPP-2024-001) shows $250K ARR while the duplicate (OPP-2024-002) shows $0. Sales team cannot proceed with contract renewal until this is resolved. Need to merge or delete the duplicate record and ensure data integrity across related objects including quotes and contacts.",
     height=90,
 )
 context_document_id = st.text_input("Context document ID (optional)", value="")
@@ -225,7 +225,7 @@ st.divider()
 st.subheader("Find Similar Tickets")
 ticket_summary = st.text_area(
     "New ticket summary",
-    value="Delete duplicate payment opportunity for XYZ Corp",
+    value="Urgent: Multiple duplicate payment opportunity records detected for XYZ Corp after system integration. Primary opportunity OPP-2024-156 ($180K) is correct, but duplicates OPP-2024-157 and OPP-2024-158 are causing confusion in sales pipeline reporting. Finance team blocked from processing Q1 invoices. Requires immediate cleanup of duplicate records and validation of associated payment schedules and contract terms.",
     height=100,
 )
 top_k = st.slider("Top K results", min_value=1, max_value=10, value=3)
@@ -277,7 +277,7 @@ st.subheader("Context -> Knowledge Graph Flow")
 st.caption("Insert one ticket and inspect how extracted context is written into Neo4j.")
 
 st.markdown(
-    "**Suggested test ticket summary:** `Delete duplicate opportunity record for ACME account`"
+    "**Suggested test ticket summary:** `Post-migration data cleanup required for enterprise customer account with multiple duplicate records affecting sales operations`"
 )
 
 trace_ticket_id = st.text_input(
@@ -285,7 +285,7 @@ trace_ticket_id = st.text_input(
 )
 trace_summary = st.text_area(
     "Ticket summary for context -> KG trace",
-    value="Delete duplicate opportunity record for ACME account",
+    value="Post-migration issue: Customer Success team reports that the enterprise account for ACME Industries has duplicate opportunity records created during the Salesforce data migration from legacy CRM. The duplicate opportunities (3 total) are causing incorrect revenue forecasting and preventing the renewal workflow from completing. Primary opportunity shows correct $500K ARR, but duplicates show partial data. Need to identify the canonical record, merge or delete duplicates, and verify all related objects (contacts, quotes, activities) are properly linked.",
     height=90,
 )
 
@@ -328,7 +328,7 @@ st.caption("Run a Cypher query and inspect returned rows.")
 
 cypher_query = st.text_area(
     "Cypher query",
-    value="MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 25",
+    value="MATCH (n)-[r]->(m)\nRETURN labels(n) AS source_labels, n.id AS source_id, n.name AS source_name,\n       type(r) AS relationship,\n       labels(m) AS target_labels, m.id AS target_id, m.name AS target_name\nLIMIT 25",
     height=120,
 )
 
